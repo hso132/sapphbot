@@ -1,7 +1,8 @@
 extern crate sapphbot;
 
-use sapphbot::data::*;
+use sapphbot::bot;
 
 fn main() {
-    let im = get_images();
+    let mut bot = bot::Bot::new().unwrap();
+    bot.run().unwrap();
 }

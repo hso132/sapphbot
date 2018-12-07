@@ -2,7 +2,6 @@
 name = "sapphbot"
 version = "0.1.0"
 authors = ["Haley Owsianko <haley.owsianko@gmail.com>"]
-edition = "2018"
 
 [dependencies]
 serde_derive = "1.0.80"

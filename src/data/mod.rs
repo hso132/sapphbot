@@ -38,7 +38,7 @@ pub fn get_images() -> HashSet<ImageResponse> {
                     return v.search.iter().cloned().collect();
                 }
             } else {
-                println!("[Error] Non-successful status received\n {:?}", resp)
+                e!("Non-successful status received", resp);
             }
         }
         timeout = timeout*2;

@@ -1,9 +1,9 @@
-use std::fs::{read_to_string, File};
+use std::fs::File;
 use std::io::Write;
 use std::{thread, time};
 use std::collections::HashSet;
+use std::error::Error;
 use super::data;
-use regex::Regex;
 
 pub struct Bot {
     token: String,
@@ -64,8 +64,28 @@ struct User {
 struct ServerChat {
     id: i64,
 }
+
+fn read_to_string(path: &str) -> Result<String, ErrorString> {
+    match std::fs::read_to_string(&path) {
+        Ok(string) => Ok(string),
+        Err(err) => Err(ErrorString(format!("Error reading file {}\n{:?}", path, err)))
+    }
+}
+
+#[derive(Debug)]
+struct ErrorString(String);
+impl Error for ErrorString {
+}
+
+impl std::fmt::Display for ErrorString {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter) -> Result<(), std::fmt::Error> {
+        let ErrorString(ref string) = &self;
+        formatter.write_str(string)
+    }
+}
+
 impl Bot {
-    pub fn new() -> Result<Bot,Box<std::error::Error>> {
+    pub fn new() -> Result<Bot, Box<Error>> {
         let token = read_to_string(TOKEN_PATH)?;
         let offset: i64 = read_to_string(OFFSET_PATH)?.trim().parse()?;
         let chats: HashSet<Chat> = match read_to_string(CHATS_PATH) {
@@ -99,14 +119,14 @@ impl Bot {
                 for message in &mut messages {
                     self.handle_command(&message);
 
-                    println!("[info] Received message{:?}", message);
+                    i!("Received message", message);
                 }
                 if time::Instant::now() - self.last_update >= time::Duration::from_secs(10) {
                     self.update_chats();
                     self.last_update = time::Instant::now();
                 }
             } else {
-                println!("Got bad message from server, {:?}\n{:?}", parsed, resp); 
+                w!("Got bad message from server", parsed, resp);
             }
 
             thread::sleep(time::Duration::from_millis(100))
@@ -139,31 +159,25 @@ impl Bot {
         match File::create(CHATS_PATH) {
             Ok(mut file) => {
                 let json = serde_json::to_string(&self.chats).unwrap();
-                println!("{}", json);
                 match file.write_all(json.as_bytes()) {
-                    Ok(_) => println!(
-                        "[info] Written {} bytes to file {}",
-                        json.as_bytes().len(),
-                        CHATS_PATH),
-                    Err(err) => println!(
-                        "[warning] Could not write to file {}, error: {:?}",
-                        CHATS_PATH,
-                        err)
-                }
+                    Ok(_) =>
+                        i!(&format!("Written {} bytes to file {}", json.as_bytes().len(), CHATS_PATH)),
+                    Err(err) => e!("Could not write to file: ", CHATS_PATH, err)
+                };
             },
             Err(err) => {
-                println!("[Warning] Could not write to file {}, error: {:?}", CHATS_PATH, err);
+                e!("Could not write to file", CHATS_PATH, err);
             }
         }
     }
     fn reply_to_message(&self, message: &Message, reply: &str) {
-        println!("[Info] Sending message to {}", message.chat.id);
+        i!("Sending message to", message.chat.id);
         let reply_url = self.url("sendMessage", &[
                                  ("text", reply),
                                  ("chat_id", &message.chat.id.to_string())
         ]);
         if let Err(err) = reqwest::get(&reply_url) {
-            println!("[Error] error sending message, {:?}", err)
+            e!("Could not send message", err);
         }
     }
 
@@ -226,33 +240,27 @@ impl Bot {
                                                          mut  text: T,
                                                          message: &Message) {
         if let Some(filter) = text.next() {
-            // Check if we have a valid Regex as second argument
-            if let Ok(_) = Regex::new(&filter) {
-                // Figure out the chat name
-                let chat_name = match text.next() {
-                    // Third argument; take it as chat name
-                    Some(name) => {
-                        self.reply_to_message(
-                            &message,
-                            &format!("Added {} to list of chats, with filter {}",
-                                     name, filter));
-                        name.to_string()
-                    }
-                    // No third argument; take the message where it was posted
-                    None => {
-                        self.reply_to_message(
-                            &message,
-                            &format!("Added this chat to list of chats, with filter {}", filter));
-                        message.chat.id.to_string()
-                    }
-                };
+            // Figure out the chat name
+            let chat_name = match text.next() {
+                // Third argument; take it as chat name
+                Some(name) => {
+                    self.reply_to_message(
+                        &message,
+                        &format!("Added {} to list of chats, with filter {}",
+                                 name, filter));
+                    name.to_string()
+                }
+                // No third argument; take the message where it was posted
+                None => {
+                    self.reply_to_message(
+                        &message,
+                        &format!("Added this chat to list of chats, with filter {}", filter));
+                    message.chat.id.to_string()
+                }
+            };
 
-                // Add it to the list
-                self.add_to_chats(Chat::new(&chat_name, filter, message.from.id));
-
-            } else {
-                self.reply_to_message(&message, "Could not parse regex")
-            }
+            // Add it to the list
+            self.add_to_chats(Chat::new(&chat_name, filter, message.from.id));
         } else {
             self.reply_to_message(&message, "Missing argument; need a filter");
         }
@@ -261,7 +269,7 @@ impl Bot {
     fn update_chats(&mut self) {
         let new_images = self.compute_new_images();
         if new_images.len() > 0 {
-            println!("[info] Got {} new images", new_images.len());
+            i!(&format!("Got {} new images", new_images.len()));
         }
         for chat in self.chats.clone() {
             for image in &new_images {
@@ -278,14 +286,12 @@ impl Bot {
                                                ("caption", &caption),
                                                //("parse_mode", "html")
                     ]);
-                    println!("[info] Sending picture to {}", chat.chat_name);
+                    i!(&format!("Sending picture to {}", chat.chat_name));
                     let resp = reqwest::get(&message_url);
                         match resp {
-                            Err(err) => println!("[Warning] error sending message\n{:?}", err),
-                            Ok(ok) => println!("[Info] received response from server: {:?}", ok)
+                            Err(err) => e!("Could not communicate with server", err),
+                            Ok(ok) => i!("Received response from server", ok)
                         }
-                } else {
-                    println!("[Info] Tags did not fit filter \"{}\" for chat {}", chat.filter, chat.chat_name);
                 }
             }
         }
@@ -303,15 +309,14 @@ impl Bot {
         }
 
         self.images=self.images.union(&new_image_ids).cloned().collect();
-        println!("[Info] {} images remembered", self.images.len());
         match File::create(IMAGES_PATH) {
             Ok(mut file) => {
                 let json = serde_json::to_string(&self.images).unwrap();
                 if let Err(err) = file.write_all(&json.as_bytes()) {
-                    println!("[Warning] error writing to file {}, {:?}", IMAGES_PATH, err)
+                    e!("Could not write to file", IMAGES_PATH, err)
                 }
             },
-            Err(err) => println!("[Warning] error writing to file {}, {:?}", IMAGES_PATH, err) 
+            Err(err) => e!("Could not write to file", IMAGES_PATH, err)
         }
         new_images
     }

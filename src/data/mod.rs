@@ -9,7 +9,7 @@ pub struct Response {
 
 #[derive(Debug, Hash, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ImageResponse {
-    pub id: u32,
+    pub id: i64,
     pub mime_type: String,
     pub image: String,
     pub representations: Representations,

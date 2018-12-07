@@ -9,7 +9,7 @@ pub struct Bot {
     token: String,
     offset: i64,
     chats: HashSet<Chat>,
-    images: HashSet<String>,
+    images: HashSet<i64>,
     last_update: time::Instant
 }
 
@@ -92,7 +92,7 @@ impl Bot {
             Ok(chats_json) => serde_json::from_str(&chats_json)?,
             Err(_) => HashSet::new() 
         };
-        let images: HashSet<String> = match read_to_string(IMAGES_PATH) {
+        let images: HashSet<i64> = match read_to_string(IMAGES_PATH) {
             Ok(images_json) => serde_json::from_str(&images_json)?,
             Err(_) => HashSet::new()
         };
@@ -274,7 +274,7 @@ impl Bot {
         for chat in self.chats.clone() {
             for image in &new_images {
                 if tags_fit(&image.tags, &chat.filter) {
-                    let image_origin = format!("http:{}", image.representations.medium);
+                    let image_origin = format!("http:{}", image.representations.large);
                     let image_source = format!("http://derpibooru.org/{}", image.id);
                     let caption = format!("{}%0A{}%0A{}",
                                           &image_source,
@@ -301,10 +301,10 @@ impl Bot {
         let images = data::get_images();
         let mut new_images = HashSet::new();
         let mut new_image_ids = HashSet::new();
-        for image in &images {
-            if !self.images.contains(&image.image) {
-                new_images.insert(image.clone());
-                new_image_ids.insert(image.image.clone());
+        for image in images {
+            if !self.images.contains(&image.id) {
+                new_image_ids.insert(image.id);
+                new_images.insert(image);
             }
         }
 
@@ -347,6 +347,7 @@ fn get_artist(tags: &str) -> String {
     }
     "".to_string()
 }
+
 fn tags_fit(tags: &str, filter: &str) -> bool {
     if filter == "any" { 
         true
@@ -376,6 +377,7 @@ fn tags_fit_list(tags: List<&str>, filter: &str) -> bool {
     }
 }
 
+// Unnecessary, but fun
 enum List<T> {
     Cons(T, Box<List<T>>),
     Nil

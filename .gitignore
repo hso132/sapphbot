@@ -1,4 +1,5 @@
 /target
 **/*.rs.bk
-token.txt
+**/*.txt
 **/*.swp
+**/*.json

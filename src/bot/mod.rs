@@ -320,7 +320,7 @@ impl Bot {
                             //("parse_mode", "html")
                         ],
                     );
-                    i!(&format!("Sending picture to {}", chat.chat_name));
+                    i!(&format!("Sending picture with id {} to {}\nHash:\n{}", image.id, chat.chat_name, image.sha512_hash));
                     let resp = reqwest::get(&message_url);
                     match resp {
                         Err(err) => e!("Could not communicate with server", err),

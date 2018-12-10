@@ -7,12 +7,12 @@ fn main() {
         Err(err) => {
             println!("Error initiating bot. \n{:?}", err);
             std::process::exit(1)
-        },
-        Ok(bot) => bot
+        }
+        Ok(bot) => bot,
     };
 
     match bot.run() {
         Err(err) => println!("The bot has abruptly stopped. \n{:?}", err),
-        _ => ()
+        _ => (),
     }
 }

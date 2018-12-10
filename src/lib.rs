@@ -32,13 +32,15 @@ pub mod log {
 
     pub fn log(message: &str) -> () {
         println!("{}", message);
-        if let Ok(mut file) = std::fs::OpenOptions::new().write(true)
-                .append(true)
-                .create(true)
-                .open("log.txt") {
-                    let _ = file.write_all(message.as_bytes());
-                }
+        if let Ok(mut file) = std::fs::OpenOptions::new()
+            .write(true)
+            .append(true)
+            .create(true)
+            .open("log.txt")
+        {
+            let _ = file.write_all(message.as_bytes());
+        }
     }
 }
-pub mod data;
 pub mod bot;
+pub mod data;

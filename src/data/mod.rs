@@ -4,7 +4,7 @@ use std::time;
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Response {
-    pub search: Vec<ImageResponse>
+    pub search: Vec<ImageResponse>,
 }
 
 #[derive(Debug, Hash, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -14,7 +14,8 @@ pub struct ImageResponse {
     pub image: String,
     pub representations: Representations,
     pub tags: String,
-    pub source_url: String
+    pub source_url: String,
+    pub sha512_hash: String
 }
 
 #[derive(Debug, Hash, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -41,10 +42,9 @@ pub fn get_images() -> HashSet<ImageResponse> {
                 e!("Non-successful status received", resp);
             }
         }
-        timeout = timeout*2;
+        timeout = timeout * 2;
         std::thread::sleep(timeout);
     }
-    
+
     HashSet::new()
 }
-

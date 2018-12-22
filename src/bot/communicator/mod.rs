@@ -1,8 +1,8 @@
-use super::*;
-use std::time;
-use std::sync::mpsc::Receiver;
-use std::io::Write;
 use super::derpiquery::data::*;
+use super::*;
+use std::io::Write;
+use std::sync::mpsc::Receiver;
+use std::time;
 
 #[derive(Debug, Serialize, Deserialize)]
 struct Reply {
@@ -34,7 +34,6 @@ struct ServerChat {
     id: i64,
 }
 
-
 pub struct Communicator {
     offset: i64,
     token: String,
@@ -42,8 +41,12 @@ pub struct Communicator {
 }
 
 impl Communicator {
-    pub fn new(offset: i64, token: String, chats: HashSet<Chat>) -> Communicator  {
-        Communicator{offset, token, chats}
+    pub fn new(offset: i64, token: String, chats: HashSet<Chat>) -> Communicator {
+        Communicator {
+            offset,
+            token,
+            chats,
+        }
     }
     pub fn run(&mut self, receiver: Receiver<Vec<ImageResponse>>) {
         'updates: loop {
@@ -51,8 +54,9 @@ impl Communicator {
                 "getUpdates",
                 &[
                     ("allowed_updates", &json_array(&["message"])),
-                    ("offset", &self.offset.to_string())
-                ]);
+                    ("offset", &self.offset.to_string()),
+                ],
+            );
             let try_resp: Result<_, _> = reqwest::get(update_url);
             if let Ok(mut raw_resp) = try_resp {
                 let try_text: Result<_, _> = raw_resp.text();
@@ -97,7 +101,7 @@ impl Communicator {
         format!(
             "https://api.telegram.org/bot{}/{}{}",
             self.token, method_name, formatted_arg_string
-            )
+        )
     }
 
     /// Parses messages in the reply, and returns them if they contain text
@@ -143,7 +147,10 @@ impl Communicator {
                             //("parse_mode", "html")
                         ],
                     );
-                    i!(&format!("Sending picture with id {} to {}", image.id, chat.chat_name), image.sha512_hash);
+                    i!(
+                        &format!("Sending picture with id {} to {}", image.id, chat.chat_name),
+                        image.sha512_hash
+                    );
                     let resp = reqwest::get(&message_url);
                     match resp {
                         Err(err) => e!("Could not communicate with server", err),
@@ -173,9 +180,9 @@ impl Communicator {
     fn handle_remove_command<'a, T: Iterator<Item = &'a str>>(
         &mut self,
         mut text: T,
-        message: &Message) {
+        message: &Message,
+    ) {
         if let Some(filter) = text.next() {
-
             let mut get_chat_name = || {
                 if let Some(chat) = text.next() {
                     chat.to_string()
@@ -185,19 +192,22 @@ impl Communicator {
             };
 
             let chat_name: String = get_chat_name();
-            if self.chats.remove(&Chat::new(&chat_name, filter, message.from.id)) {
+            if self
+                .chats
+                .remove(&Chat::new(&chat_name, filter, message.from.id))
+            {
                 self.reply_to_message(
                     message,
                     &format!(
                         "Successfully removed chat {} with filter {} from posting list.",
                         chat_name, filter
-                        ),
-                        );
+                    ),
+                );
             } else {
                 self.reply_to_message(message, "No matching setting found");
             }
 
-            // No argument; removes all for that chat
+        // No argument; removes all for that chat
         } else {
             let cond = |c: &Chat| {
                 c.requester != message.from.id || c.chat_name != message.chat.id.to_string()
@@ -212,7 +222,7 @@ impl Communicator {
         &mut self,
         mut text: T,
         message: &Message,
-        ) {
+    ) {
         if let Some(filter) = text.next() {
             // Figure out the chat name
             let chat_name = match text.next() {
@@ -221,7 +231,7 @@ impl Communicator {
                     self.reply_to_message(
                         &message,
                         &format!("Added {} to list of chats, with filter {}", name, filter),
-                        );
+                    );
                     name.to_string()
                 }
                 // No third argument; take the message where it was posted
@@ -229,7 +239,7 @@ impl Communicator {
                     self.reply_to_message(
                         &message,
                         &format!("Added this chat to list of chats, with filter {}", filter),
-                        );
+                    );
                     message.chat.id.to_string()
                 }
             };
@@ -252,8 +262,6 @@ impl Communicator {
         }
     }
 
-
-
     fn add_to_chats(&mut self, chat: Chat) {
         self.chats.insert(chat);
         save_chats(&self.chats);
@@ -266,10 +274,10 @@ fn save_chats(chats: &HashSet<Chat>) {
             let json = serde_json::to_string(chats).unwrap();
             match file.write_all(json.as_bytes()) {
                 Ok(_) => i!(&format!(
-                        "Written {} bytes to file {}",
-                        json.as_bytes().len(),
-                        CHATS_PATH
-                        )),
+                    "Written {} bytes to file {}",
+                    json.as_bytes().len(),
+                    CHATS_PATH
+                )),
                 Err(err) => e!("Could not write to file: ", CHATS_PATH, err),
             };
         }
@@ -277,4 +285,56 @@ fn save_chats(chats: &HashSet<Chat>) {
             e!("Could not write to file", CHATS_PATH, err);
         }
     }
+}
+
+fn get_artist(tags: &str) -> String {
+    for dirty_tag in tags.split(',') {
+        let tag = dirty_tag.trim();
+        if tag.contains("artist:") {
+            return tag.to_string();
+        }
+    }
+    "".to_string()
+}
+fn tags_fit(tags: &str, filter: &str) -> bool {
+    if filter == "any" {
+        true
+    } else {
+        use self::List::*;
+        let mut list = Nil;
+        for dirty_tag in tags.split(',') {
+            let tag = dirty_tag.trim();
+            list = Cons(tag, Box::new(list));
+        }
+        tags_fit_list(list, filter)
+    }
+}
+
+fn tags_fit_list(tags: List<&str>, filter: &str) -> bool {
+    use self::List::*;
+    match tags {
+        Cons(string, rest) => {
+            if string == filter {
+                true
+            } else {
+                tags_fit_list(*rest, filter)
+            }
+        }
+        Nil => false,
+    }
+}
+
+// Unnecessary, but fun
+enum List<T> {
+    Cons(T, Box<List<T>>),
+    Nil,
+}
+
+fn json_array(args: &[&str]) -> String {
+    let formatted_args = args
+        .iter()
+        .map(|s| format!("\"{}\"", s))
+        .collect::<Vec<_>>()
+        .join(", ");
+    format!("[{}]", formatted_args)
 }

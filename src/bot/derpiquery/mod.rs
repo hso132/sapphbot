@@ -1,7 +1,7 @@
-use std::time::Duration;
-use ::bot::*;
-use std::sync::mpsc::Sender;
+use bot::*;
 use std::io::Write;
+use std::sync::mpsc::Sender;
+use std::time::Duration;
 
 pub mod data;
 use self::data::ImageResponse;
@@ -9,15 +9,17 @@ pub struct Derpiquery {
     images: HashSet<String>,
 }
 
-
 impl Derpiquery {
     pub fn new(images: HashSet<String>) -> Derpiquery {
-        Derpiquery{images}
+        Derpiquery { images }
     }
     pub fn run(&mut self, sender: Sender<Vec<ImageResponse>>) {
         'updates: loop {
             std::thread::sleep(Duration::from_secs(10));
-            sender.send(self.compute_new_images());
+            match sender.send(self.compute_new_images()) {
+                Err(err) => e!(err),
+                _ => (),
+            };
         }
     }
     fn compute_new_images(&mut self) -> Vec<data::ImageResponse> {

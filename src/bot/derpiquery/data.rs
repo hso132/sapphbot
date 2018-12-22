@@ -15,7 +15,7 @@ pub struct ImageResponse {
     pub representations: Representations,
     pub tags: String,
     pub source_url: String,
-    pub sha512_hash: String
+    pub sha512_hash: String,
 }
 
 #[derive(Debug, Hash, Clone, PartialEq, Eq, Serialize, Deserialize)]

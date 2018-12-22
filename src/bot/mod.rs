@@ -1,14 +1,14 @@
 use std::collections::HashSet;
 use std::error::Error;
 use std::fs::File;
-use std::{thread, time};
 use std::sync::mpsc;
+use std::thread;
 
 mod communicator;
 mod derpiquery;
 
-use self::derpiquery::Derpiquery;
 use self::communicator::Communicator;
+use self::derpiquery::Derpiquery;
 pub struct Bot {
     derpiquery: Derpiquery,
     communicator: Communicator,
@@ -68,11 +68,17 @@ impl Bot {
         let images = raw_images.lines().map(String::from);
         let derpiquery = Derpiquery::new(images.collect());
         let communicator = Communicator::new(offset, token, chats);
-        Ok(Bot {derpiquery, communicator})
+        Ok(Bot {
+            derpiquery,
+            communicator,
+        })
     }
 
-    pub fn run(self) -> Result<(),Box<Error>> {
-        let Bot{mut derpiquery,mut communicator} = self;
+    pub fn run(self) -> Result<(), Box<Error>> {
+        let Bot {
+            mut derpiquery,
+            mut communicator,
+        } = self;
         let (sender, receiver) = mpsc::channel();
         let t1 = thread::spawn(move || {
             derpiquery.run(sender);
@@ -86,57 +92,4 @@ impl Bot {
         t2.join().unwrap();
         Ok(())
     }
-}
-
-fn get_artist(tags: &str) -> String {
-    for dirty_tag in tags.split(',') {
-        let tag = dirty_tag.trim();
-        if tag.contains("artist:") {
-            return tag.to_string();
-        }
-    }
-    "".to_string()
-}
-
-fn tags_fit(tags: &str, filter: &str) -> bool {
-    if filter == "any" {
-        true
-    } else {
-        use self::List::*;
-        let mut list = Nil;
-        for dirty_tag in tags.split(',') {
-            let tag = dirty_tag.trim();
-            list = Cons(tag, Box::new(list));
-        }
-        tags_fit_list(list, filter)
-    }
-}
-
-fn tags_fit_list(tags: List<&str>, filter: &str) -> bool {
-    use self::List::*;
-    match tags {
-        Cons(string, rest) => {
-            if string == filter {
-                true
-            } else {
-                tags_fit_list(*rest, filter)
-            }
-        }
-        Nil => false,
-    }
-}
-
-// Unnecessary, but fun
-enum List<T> {
-    Cons(T, Box<List<T>>),
-    Nil,
-}
-
-fn json_array(args: &[&str]) -> String {
-    let formatted_args = args
-        .iter()
-        .map(|s| format!("\"{}\"", s))
-        .collect::<Vec<_>>()
-        .join(", ");
-    format!("[{}]", formatted_args)
 }

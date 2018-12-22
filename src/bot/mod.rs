@@ -1,14 +1,17 @@
 use std::collections::HashSet;
 use std::error::Error;
 use std::fs::File;
-use std::io::Write;
 use std::{thread, time};
+use std::sync::mpsc;
 
 mod communicator;
 mod derpiquery;
+
+use self::derpiquery::Derpiquery;
+use self::communicator::Communicator;
 pub struct Bot {
-    chats: HashSet<Chat>,
-    last_update: time::Instant,
+    derpiquery: Derpiquery,
+    communicator: Communicator,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone, Eq, PartialEq, Hash)]
@@ -61,12 +64,27 @@ impl Bot {
             Ok(chats_json) => serde_json::from_str(&chats_json)?,
             Err(_) => HashSet::new(),
         };
+        let raw_images = read_to_string(IMAGES_PATH)?;
+        let images = raw_images.lines().map(String::from);
+        let derpiquery = Derpiquery::new(images.collect());
+        let communicator = Communicator::new(offset, token, chats);
+        Ok(Bot {derpiquery, communicator})
+    }
 
-        let last_update = time::Instant::now();
-        Ok(Bot {
-            chats,
-            last_update,
-        })
+    pub fn run(self) -> Result<(),Box<Error>> {
+        let Bot{mut derpiquery,mut communicator} = self;
+        let (sender, receiver) = mpsc::channel();
+        let t1 = thread::spawn(move || {
+            derpiquery.run(sender);
+        });
+
+        let t2 = thread::spawn(move || {
+            communicator.run(receiver);
+        });
+
+        t1.join().unwrap();
+        t2.join().unwrap();
+        Ok(())
     }
 }
 

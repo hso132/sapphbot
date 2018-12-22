@@ -3,7 +3,7 @@ extern crate sapphbot;
 use sapphbot::bot;
 
 fn main() {
-    let mut bot = match bot::Bot::new() {
+    let bot = match bot::Bot::new() {
         Err(err) => {
             println!("Error initiating bot. \n{:?}", err);
             std::process::exit(1)
